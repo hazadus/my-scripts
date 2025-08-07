@@ -48,6 +48,42 @@ def strip_html(content: str) -> str:
     return html.unescape(text).strip()
 
 
+def html_to_markdown(content: str) -> str:
+    """Очень простой конвертер HTML Mastodon-контента в Markdown.
+
+    Поддерживает переносы строк и гиперссылки. Остальные теги удаляются.
+    """
+    if not content:
+        return ""
+    text = content
+    # Переносы строк
+    text = re.sub(r"<\s*br\s*/?\s*>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"</\s*p\s*>\s*<\s*p\s*>", "\n\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<\s*p\s*>", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"</\s*p\s*>", "\n\n", text, flags=re.IGNORECASE)
+
+    # Ссылки: <a href="URL">TEXT</a> -> [TEXT](URL)
+    def _link_repl(match: re.Match) -> str:
+        url = match.group(1)
+        inner = match.group(2)
+        inner_clean = re.sub(r"<[^>]+>", "", inner)
+        return f"[{html.unescape(inner_clean)}]({url})"
+
+    text = re.sub(
+        r"<a[^>]+href=\"([^\"]+)\"[^>]*>(.*?)</a>",
+        _link_repl,
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+    # Удаляем прочие теги
+    text = re.sub(r"<[^>]+>", "", text)
+    text = html.unescape(text)
+    # Чистим лишние пустые строки
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    return text
+
+
 def fetch_home_for_date(
     mastodon: Mastodon,
     target_date: dt.date,
@@ -103,6 +139,11 @@ def main() -> None:
         nargs="?",
         help="Дата в формате YYYY-MM-DD (по умолчанию — сегодня)",
     )
+    parser.add_argument(
+        "--markdown",
+        action="store_true",
+        help="Выводить посты в формате Markdown (ссылки и изображения)",
+    )
     args = parser.parse_args()
 
     target_date = parse_date(args.date)
@@ -113,13 +154,34 @@ def main() -> None:
         print(f"Постов за {target_date.isoformat()} не найдено.")
         return
 
-    print(f"Постов за {target_date.isoformat()}: {len(statuses)}")
+    print(f"Постов за {target_date.isoformat()}: {len(statuses)}\n")
 
     for status in statuses:
         created_at = status["created_at"].astimezone().strftime("%H:%M")
         user = status["account"]["acct"]
-        text = strip_html(status["content"]) or "[медиа/без текста]"
-        print(f"{created_at} @{user}: {text}")
+        if args.markdown:
+            body = html_to_markdown(status.get("content", "")) or "[медиа/без текста]"
+            print("----")
+            print(f"**🕒 {created_at} 👤 @{user}**")
+            print(f"💬 {body}")
+            # Медиа (изображения)
+            for media in status.get("media_attachments", []) or []:
+                if media.get("type") == "image":
+                    alt = media.get("description") or "image"
+                    url = (
+                        media.get("url")
+                        or media.get("remote_url")
+                        or media.get("preview_url")
+                    )
+                    if url:
+                        print(f"\n![{alt}]({url})")
+            # Ссылка на оригинал поста
+            if status.get("url"):
+                print(f"\n[Открыть пост]({status['url']})")
+            print()
+        else:
+            text = strip_html(status.get("content", "")) or "[медиа/без текста]"
+            print(f"{created_at} @{user}: {text}")
 
 
 if __name__ == "__main__":
