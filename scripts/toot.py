@@ -13,6 +13,7 @@ Docs:
 - https://mastodonpy.readthedocs.io/en/stable/
 """
 import argparse
+
 from mastodon import Mastodon
 
 

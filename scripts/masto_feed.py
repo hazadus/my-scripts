@@ -19,7 +19,6 @@ import re
 
 from mastodon import Mastodon
 
-
 ACCESS_TOKEN_FILE = "toot_usercred.secret"
 
 

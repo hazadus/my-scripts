@@ -6,9 +6,10 @@
 #   "certifi"
 # ]
 # ///
-from yt_dlp import YoutubeDL
-import ssl
 import argparse
+import ssl
+
+from yt_dlp import YoutubeDL
 
 
 def download_video(

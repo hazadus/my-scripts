@@ -6,6 +6,7 @@
 # ]
 # ///
 import sys
+
 import boto3
 
 AWS_BUCKET_NAME = "snatcher"

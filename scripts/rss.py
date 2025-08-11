@@ -12,12 +12,13 @@ RSS OPML Parser
 """
 
 import argparse
-import xml.etree.ElementTree as ET
 import sys
-from pathlib import Path
-import feedparser
-from datetime import datetime, timedelta
 import time
+import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta
+from pathlib import Path
+
+import feedparser
 import requests
 
 

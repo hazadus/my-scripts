@@ -16,11 +16,12 @@
     uv run gitlines.py https://github.com/username/repo your_github_token
 """
 
-import sys
-import requests
 import re
+import sys
 from datetime import datetime
-from typing import Tuple, Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
+
+import requests
 
 
 def parse_repo_info(repo_url: str) -> Tuple[str, str]:
