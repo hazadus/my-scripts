@@ -51,6 +51,12 @@ def main():
         help="Вывести посты из всех лент за указанную дату (формат: YYYY-MM-DD)",
     )
 
+    parser.add_argument(
+        "--silent",
+        action="store_true",
+        help="Не выводить системные сообщения, показывать ошибки обработки лент после отчета",
+    )
+
     args = parser.parse_args()
 
     # Проверяем существование файла
@@ -64,15 +70,16 @@ def main():
 
     # Выполняем действие в зависимости от флагов
     if args.list:
-        list_feeds(feeds=feeds)
+        list_feeds(feeds=feeds, silent=args.silent)
     elif args.read:
-        async_read_posts_wrapper(feeds=feeds, date_str=args.read)
+        async_read_posts_wrapper(feeds=feeds, date_str=args.read, silent=args.silent)
     else:
         # Если никакие флаги не указаны, показываем краткую справку
-        print(f"Файл '{args.opml_file}' содержит {len(feeds)} RSS лент.")
-        print("Используйте флаг --list для просмотра списка лент.")
-        print("Используйте флаг --read YYYY-MM-DD для чтения постов за дату.")
-        print("Для подробной справки используйте --help")
+        if not args.silent:
+            print(f"Файл '{args.opml_file}' содержит {len(feeds)} RSS лент.")
+            print("Используйте флаг --list для просмотра списка лент.")
+            print("Используйте флаг --read YYYY-MM-DD для чтения постов за дату.")
+            print("Для подробной справки используйте --help")
 
 
 # MARK: parse_opml
@@ -122,19 +129,22 @@ def parse_opml(
 def list_feeds(
     *,
     feeds: list[dict],
+    silent: bool = False,
 ):
     """
     Выводит список всех RSS URL.
 
     Args:
         feeds (list): Список с информацией о RSS лентах
+        silent (bool): Не выводить системные сообщения
     """
     if not feeds:
         print("RSS ленты не найдены в файле OPML")
         return
 
-    print(f"Найдено {len(feeds)} RSS лент:")
-    print("-" * 50)
+    if not silent:
+        print(f"Найдено {len(feeds)} RSS лент:")
+        print("-" * 50)
 
     for i, feed in enumerate(feeds, 1):
         print(f"{i:3d}. {feed['title']}")
@@ -181,6 +191,8 @@ async def get_feed_posts(
     start_date: datetime,
     end_date: datetime,
     max_retries: int = 2,
+    silent: bool = False,
+    errors_list: list = None,
 ):
     """
     Получает посты из RSS ленты за указанный период с повторными попытками.
@@ -191,10 +203,14 @@ async def get_feed_posts(
         start_date (datetime): Начало периода
         end_date (datetime): Конец периода
         max_retries (int): Максимальное количество попыток
+        silent (bool): Не выводить системные сообщения
+        errors_list (list): Список для сбора ошибок (в режиме silent)
 
     Returns:
         list: Список постов за указанный период
     """
+    if errors_list is None:
+        errors_list = []
 
     for attempt in range(max_retries + 1):
         try:
@@ -229,94 +245,124 @@ async def get_feed_posts(
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429:
-                print(
-                    f"Слишком много запросов к {url} (429). Пропускаем.",
-                    file=sys.stderr,
-                )
+                error_msg = f"Слишком много запросов к {url} (429). Пропускаем."
+                if silent:
+                    errors_list.append(error_msg)
+                else:
+                    print(error_msg, file=sys.stderr)
             elif e.response.status_code == 403:
-                print(f"Доступ запрещен к {url} (403). Пропускаем.", file=sys.stderr)
+                error_msg = f"Доступ запрещен к {url} (403). Пропускаем."
+                if silent:
+                    errors_list.append(error_msg)
+                else:
+                    print(error_msg, file=sys.stderr)
             elif e.response.status_code == 404:
-                print(f"Лента не найдена {url} (404). Пропускаем.", file=sys.stderr)
+                error_msg = f"Лента не найдена {url} (404). Пропускаем."
+                if silent:
+                    errors_list.append(error_msg)
+                else:
+                    print(error_msg, file=sys.stderr)
             else:
-                print(
-                    f"HTTP ошибка {e.response.status_code} при загрузке {url}",
-                    file=sys.stderr,
-                )
+                error_msg = f"HTTP ошибка {e.response.status_code} при загрузке {url}"
+                if silent:
+                    errors_list.append(error_msg)
+                else:
+                    print(error_msg, file=sys.stderr)
             return []
         except (httpx.TimeoutException, httpx.ConnectTimeout, httpx.ReadTimeout) as e:
             error_type = type(e).__name__
             if attempt < max_retries:
                 wait_time = (attempt + 1) * 2  # Экспоненциальная задержка
-                print(
-                    f"Таймаут ({error_type}) для {url}, попытка {attempt + 1}/{max_retries + 1}. Ждем {wait_time}с...",
-                    file=sys.stderr,
-                )
+                error_msg = f"Таймаут ({error_type}) для {url}, попытка {attempt + 1}/{max_retries + 1}. Ждем {wait_time}с..."
+                if not silent:
+                    print(error_msg, file=sys.stderr)
                 await asyncio.sleep(wait_time)
                 continue
             else:
-                print(
-                    f"Таймаут ({error_type}) при загрузке ленты {url} после {max_retries + 1} попыток: {e}",
-                    file=sys.stderr,
-                )
+                error_msg = f"Таймаут ({error_type}) при загрузке ленты {url} после {max_retries + 1} попыток: {e}"
+                if silent:
+                    errors_list.append(error_msg)
+                else:
+                    print(error_msg, file=sys.stderr)
                 return []
         except httpx.ConnectError as e:
             if attempt < max_retries:
                 wait_time = (attempt + 1) * 2
-                print(
-                    f"Ошибка подключения к {url}, попытка {attempt + 1}/{max_retries + 1}. Ждем {wait_time}с...",
-                    file=sys.stderr,
-                )
+                error_msg = f"Ошибка подключения к {url}, попытка {attempt + 1}/{max_retries + 1}. Ждем {wait_time}с..."
+                if not silent:
+                    print(error_msg, file=sys.stderr)
                 await asyncio.sleep(wait_time)
                 continue
             else:
-                print(
-                    f"Ошибка подключения к {url} после {max_retries + 1} попыток: {e}",
-                    file=sys.stderr,
+                error_msg = (
+                    f"Ошибка подключения к {url} после {max_retries + 1} попыток: {e}"
                 )
+                if silent:
+                    errors_list.append(error_msg)
+                else:
+                    print(error_msg, file=sys.stderr)
                 return []
         except httpx.UnsupportedProtocol as e:
-            print(f"Неподдерживаемый протокол для {url}: {e}", file=sys.stderr)
+            error_msg = f"Неподдерживаемый протокол для {url}: {e}"
+            if silent:
+                errors_list.append(error_msg)
+            else:
+                print(error_msg, file=sys.stderr)
             return []
         except httpx.TooManyRedirects as e:
-            print(f"Слишком много перенаправлений для {url}: {e}", file=sys.stderr)
+            error_msg = f"Слишком много перенаправлений для {url}: {e}"
+            if silent:
+                errors_list.append(error_msg)
+            else:
+                print(error_msg, file=sys.stderr)
             return []
         except httpx.InvalidURL as e:
-            print(f"Некорректный URL {url}: {e}", file=sys.stderr)
+            error_msg = f"Некорректный URL {url}: {e}"
+            if silent:
+                errors_list.append(error_msg)
+            else:
+                print(error_msg, file=sys.stderr)
             return []
         except ssl.SSLError as e:
             if attempt < max_retries:
                 wait_time = (attempt + 1) * 2
-                print(
-                    f"SSL ошибка для {url}, попытка {attempt + 1}/{max_retries + 1}. Ждем {wait_time}с...",
-                    file=sys.stderr,
-                )
+                error_msg = f"SSL ошибка для {url}, попытка {attempt + 1}/{max_retries + 1}. Ждем {wait_time}с..."
+                if not silent:
+                    print(error_msg, file=sys.stderr)
                 await asyncio.sleep(wait_time)
                 continue
             else:
-                print(
-                    f"SSL ошибка для {url} после {max_retries + 1} попыток: {e}",
-                    file=sys.stderr,
-                )
+                error_msg = f"SSL ошибка для {url} после {max_retries + 1} попыток: {e}"
+                if silent:
+                    errors_list.append(error_msg)
+                else:
+                    print(error_msg, file=sys.stderr)
                 return []
         except httpx.RequestError as e:
             # Ловим остальные сетевые ошибки
             error_type = type(e).__name__
             if attempt < max_retries and "timeout" in str(e).lower():
                 wait_time = (attempt + 1) * 2
-                print(
-                    f"Сетевая ошибка ({error_type}) для {url}, попытка {attempt + 1}/{max_retries + 1}. Ждем {wait_time}с...",
-                    file=sys.stderr,
-                )
+                error_msg = f"Сетевая ошибка ({error_type}) для {url}, попытка {attempt + 1}/{max_retries + 1}. Ждем {wait_time}с..."
+                if not silent:
+                    print(error_msg, file=sys.stderr)
                 await asyncio.sleep(wait_time)
                 continue
             else:
-                print(
-                    f"Сетевая ошибка ({error_type}) при загрузке ленты {url}: {e}",
-                    file=sys.stderr,
+                error_msg = (
+                    f"Сетевая ошибка ({error_type}) при загрузке ленты {url}: {e}"
                 )
+                if silent:
+                    errors_list.append(error_msg)
+                else:
+                    print(error_msg, file=sys.stderr)
                 return []
         except Exception as e:
-            print(f"Неожиданная ошибка при обработке ленты {url}: {e}", file=sys.stderr)
+            error_msg = f"Неожиданная ошибка при обработке ленты {url}: {e}"
+            if silent:
+                errors_list.append(error_msg)
+            else:
+                print(error_msg, file=sys.stderr)
             return []
 
     # Этот return никогда не должен быть достигнут
@@ -328,6 +374,7 @@ async def read_posts_for_date(
     *,
     feeds: list[dict],
     date_str: str,
+    silent: bool = False,
 ):
     """
     Читает посты из всех лент за указанную дату.
@@ -335,13 +382,16 @@ async def read_posts_for_date(
     Args:
         feeds (list): Список RSS лент
         date_str (str): Дата в формате YYYY-MM-DD
+        silent (bool): Не выводить системные сообщения
     """
     start_date, end_date = parse_date_argument(date_str=date_str)
 
-    print(f"Поиск постов за {date_str}...")
-    print("-" * 50)
+    if not silent:
+        print(f"Поиск постов за {date_str}...")
+        print("-" * 50)
 
     all_posts = []
+    errors_list = []
 
     # Создаем HTTP клиент для всех запросов
     async with httpx.AsyncClient(
@@ -364,17 +414,21 @@ async def read_posts_for_date(
         # Создаем задачи для асинхронного выполнения
         tasks = []
         for feed in feeds:
-            print(f"Добавляем в очередь: {feed['title']}")
+            if not silent:
+                print(f"Добавляем в очередь: {feed['title']}")
             task = get_feed_posts(
                 client=client,
                 url=feed["url"],
                 start_date=start_date,
                 end_date=end_date,
+                silent=silent,
+                errors_list=errors_list,
             )
             tasks.append(task)
 
         # Выполняем все запросы параллельно
-        print(f"Загружаем {len(tasks)} RSS лент параллельно...")
+        if not silent:
+            print(f"Загружаем {len(tasks)} RSS лент параллельно...")
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Собираем результаты
@@ -382,16 +436,26 @@ async def read_posts_for_date(
             if isinstance(result, list):
                 all_posts.extend(result)
             elif isinstance(result, Exception):
-                print(f"Ошибка при обработке ленты: {result}", file=sys.stderr)
+                error_msg = f"Ошибка при обработке ленты: {result}"
+                if silent:
+                    errors_list.append(error_msg)
+                else:
+                    print(error_msg, file=sys.stderr)
 
     # Сортируем посты по дате (от старых к новым)
     all_posts.sort(key=lambda x: x["published"])
 
-    print(f"\nНайдено {len(all_posts)} постов за {date_str}:")
-    print("=" * 50)
+    if not silent:
+        print(f"\nНайдено {len(all_posts)} постов за {date_str}:")
+        print("=" * 50)
 
     if not all_posts:
         print("Посты за указанную дату не найдены.")
+        # Показываем ошибки после отчета в режиме silent
+        if silent and errors_list:
+            print("\nОшибки обработки лент:", file=sys.stderr)
+            for error in errors_list:
+                print(f"  {error}", file=sys.stderr)
         return
 
     for post in all_posts:
@@ -406,12 +470,19 @@ async def read_posts_for_date(
                 desc += "..."
             print(f"  Описание: {desc}")
 
+    # Показываем ошибки после отчета в режиме silent
+    if silent and errors_list:
+        print("\nОшибки обработки лент:", file=sys.stderr)
+        for error in errors_list:
+            print(f"  {error}", file=sys.stderr)
+
 
 # MARK: async_read_posts_wrapper
 def async_read_posts_wrapper(
     *,
     feeds: list[dict],
     date_str: str,
+    silent: bool = False,
 ):
     """
     Обертка для запуска асинхронной функции read_posts_for_date.
@@ -419,8 +490,9 @@ def async_read_posts_wrapper(
     Args:
         feeds (list): Список RSS лент
         date_str (str): Дата в формате YYYY-MM-DD
+        silent (bool): Не выводить системные сообщения
     """
-    asyncio.run(read_posts_for_date(feeds=feeds, date_str=date_str))
+    asyncio.run(read_posts_for_date(feeds=feeds, date_str=date_str, silent=silent))
 
 
 if __name__ == "__main__":
