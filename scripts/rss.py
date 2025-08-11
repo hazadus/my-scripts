@@ -13,6 +13,7 @@ RSS OPML Reader
 
 import argparse
 import asyncio
+import re
 import ssl
 import sys
 import xml.etree.ElementTree as ET
@@ -33,6 +34,7 @@ def main():
   %(prog)s feeds.opml --list              # Показать список всех RSS лент
   %(prog)s feeds.opml -l                  # Короткая форма флага --list
   %(prog)s feeds.opml --read 2025-01-15   # Показать посты за 15 января 2025
+  %(prog)s feeds.opml --read 2025-01-15 --markdown  # Показать посты в формате Markdown
         """,
     )
 
@@ -57,6 +59,12 @@ def main():
         help="Не выводить системные сообщения, показывать ошибки обработки лент после отчета",
     )
 
+    parser.add_argument(
+        "--markdown",
+        action="store_true",
+        help="Выводить отчет в формате Markdown",
+    )
+
     args = parser.parse_args()
 
     # Проверяем существование файла
@@ -72,7 +80,9 @@ def main():
     if args.list:
         list_feeds(feeds=feeds, silent=args.silent)
     elif args.read:
-        async_read_posts_wrapper(feeds=feeds, date_str=args.read, silent=args.silent)
+        async_read_posts_wrapper(
+            feeds=feeds, date_str=args.read, silent=args.silent, markdown=args.markdown
+        )
     else:
         # Если никакие флаги не указаны, показываем краткую справку
         if not args.silent:
@@ -369,12 +379,60 @@ async def get_feed_posts(
     return []
 
 
+# MARK: format_posts_markdown
+def format_posts_markdown(
+    *,
+    posts: list[dict],
+    date_str: str,
+) -> str:
+    """
+    Форматирует посты в формате Markdown.
+
+    Args:
+        posts (list): Список постов
+        date_str (str): Дата в формате YYYY-MM-DD
+
+    Returns:
+        str: Отформатированный отчет в Markdown
+    """
+    if not posts:
+        return f"## Посты за {date_str}\n\nВсего постов: 0\n\nПосты за указанную дату не найдены."
+
+    # Заголовок отчета
+    output = f"## Посты за {date_str}\n\n"
+    output += f"Всего постов: {len(posts)}\n\n"
+    output += "----\n\n"
+
+    # Форматируем каждый пост
+    for post in posts:
+        # Заголовок поста с названием ленты
+        output += f"### {post['title']} ({post['feed_title']})\n\n"
+
+        # Ссылка на пост
+        if post["link"]:
+            output += f"🔗 {post['link']}\n\n"
+
+        # Краткое содержимое поста
+        if post["description"]:
+            # Очищаем HTML-теги из описания (простая очистка)
+            clean_desc = re.sub(r"<[^>]+>", "", post["description"])
+            # Ограничиваем длину описания
+            if len(clean_desc) > 300:
+                clean_desc = clean_desc[:300] + "..."
+            output += f"💬 {clean_desc}\n\n"
+
+        output += "---\n\n"
+
+    return output
+
+
 # MARK: read_posts_for_date
 async def read_posts_for_date(
     *,
     feeds: list[dict],
     date_str: str,
     silent: bool = False,
+    markdown: bool = False,
 ):
     """
     Читает посты из всех лент за указанную дату.
@@ -383,6 +441,7 @@ async def read_posts_for_date(
         feeds (list): Список RSS лент
         date_str (str): Дата в формате YYYY-MM-DD
         silent (bool): Не выводить системные сообщения
+        markdown (bool): Выводить отчет в формате Markdown
     """
     start_date, end_date = parse_date_argument(date_str=date_str)
 
@@ -445,6 +504,18 @@ async def read_posts_for_date(
     # Сортируем посты по дате (от старых к новым)
     all_posts.sort(key=lambda x: x["published"])
 
+    if markdown:
+        # Выводим в формате Markdown
+        markdown_output = format_posts_markdown(posts=all_posts, date_str=date_str)
+        print(markdown_output)
+
+        # Показываем ошибки после отчета в режиме silent
+        if silent and errors_list:
+            print("\nОшибки обработки лент:", file=sys.stderr)
+            for error in errors_list:
+                print(f"  {error}", file=sys.stderr)
+        return
+
     if not silent:
         print(f"\nНайдено {len(all_posts)} постов за {date_str}:")
         print("=" * 50)
@@ -483,6 +554,7 @@ def async_read_posts_wrapper(
     feeds: list[dict],
     date_str: str,
     silent: bool = False,
+    markdown: bool = False,
 ):
     """
     Обертка для запуска асинхронной функции read_posts_for_date.
@@ -491,8 +563,13 @@ def async_read_posts_wrapper(
         feeds (list): Список RSS лент
         date_str (str): Дата в формате YYYY-MM-DD
         silent (bool): Не выводить системные сообщения
+        markdown (bool): Выводить отчет в формате Markdown
     """
-    asyncio.run(read_posts_for_date(feeds=feeds, date_str=date_str, silent=silent))
+    asyncio.run(
+        read_posts_for_date(
+            feeds=feeds, date_str=date_str, silent=silent, markdown=markdown
+        )
+    )
 
 
 if __name__ == "__main__":
