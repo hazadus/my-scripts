@@ -1,3 +1,4 @@
 .venv/
 scripts/*.secret
+scripts/*.opml
 .vscode/
