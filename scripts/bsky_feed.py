@@ -53,6 +53,40 @@ def strip_html(content: str) -> str:
     return text.strip()
 
 
+def restore_links_in_text(text: str, entities: list = None, facets: list = None) -> str:
+    """Восстанавливает полные ссылки в тексте поста, заменяя сокращенные URL на полные.
+    
+    Args:
+        text: Исходный текст поста
+        entities: Список сущностей (ссылок) из поста
+        facets: Список фасетов (форматирования) из поста
+    
+    Returns:
+        Текст с восстановленными полными ссылками
+    """
+    if not text or not entities:
+        return text
+    
+    # Сортируем entities по позиции в тексте (от конца к началу, чтобы не сбить индексы)
+    sorted_entities = sorted(entities, key=lambda x: x.get('index', {}).get('start', 0), reverse=True)
+    
+    restored_text = text
+    
+    for entity in sorted_entities:
+        if entity.get('type') == 'app.bsky.richtext.facet#link':
+            index = entity.get('index', {})
+            start = index.get('start', 0)
+            end = index.get('end', 0)
+            url = entity.get('value', '')
+            
+            if start < end and start < len(restored_text) and end <= len(restored_text):
+                # Заменяем сокращенную ссылку на полную
+                shortened_link = restored_text[start:end]
+                restored_text = restored_text[:start] + url + restored_text[end:]
+    
+    return restored_text
+
+
 def html_to_markdown(content: str) -> str:
     """Очень простой конвертер HTML Bluesky-контента в Markdown.
 
@@ -165,6 +199,8 @@ def fetch_home_for_date(
                             "author": post.post.author.handle,
                             "display_name": getattr(post.post.author, 'displayName', None) or getattr(post.post.author, 'display_name', None) or post.post.author.handle,
                             "content": getattr(post.post.record, 'text', ''),
+                            "entities": getattr(post.post.record, 'entities', []),
+                            "facets": getattr(post.post.record, 'facets', []),
                             "uri": post.post.uri,
                             "cid": post.post.cid,
                             "is_repost": hasattr(post, "reason") and post.reason is not None,
@@ -274,7 +310,13 @@ def main() -> None:
                 repost_user = post.get("repost_author", "unknown")
                 repost_display_name = post.get("repost_display_name") or repost_user
                 print(f"**🔄 {created_at} 👤 @{user} ({display_name}) репостнул пост от @{repost_user} ({repost_display_name})**")
-                body = html_to_markdown(post.get("content", "")) or "[медиа/без текста]"
+                # Восстанавливаем ссылки в тексте
+                content_with_links = restore_links_in_text(
+                    post.get("content", ""), 
+                    post.get("entities", []), 
+                    post.get("facets", [])
+                )
+                body = html_to_markdown(content_with_links) or "[медиа/без текста]"
                 print(f"💬 {body}")
                 # Медиа (изображения)
                 for media in post.get("media", []):
@@ -289,7 +331,13 @@ def main() -> None:
             else:
                 # Обычный пост
                 print(f"**🕒 {created_at} 👤 @{user} ({display_name})**")
-                body = html_to_markdown(post.get("content", "")) or "[медиа/без текста]"
+                # Восстанавливаем ссылки в тексте
+                content_with_links = restore_links_in_text(
+                    post.get("content", ""), 
+                    post.get("entities", []), 
+                    post.get("facets", [])
+                )
+                body = html_to_markdown(content_with_links) or "[медиа/без текста]"
                 print(f"💬 {body}")
                 # Медиа (изображения)
                 for media in post.get("media", []):
@@ -306,11 +354,23 @@ def main() -> None:
             if is_repost:
                 # Это репост - показываем информацию о репосте
                 repost_user = post.get("repost_author", "unknown")
-                text = strip_html(post.get("content", "")) or "[медиа/без текста]"
+                # Восстанавливаем ссылки в тексте
+                content_with_links = restore_links_in_text(
+                    post.get("content", ""), 
+                    post.get("entities", []), 
+                    post.get("facets", [])
+                )
+                text = strip_html(content_with_links) or "[медиа/без текста]"
                 print(f"{created_at} @{user} ({display_name}) репостнул от @{repost_user}: {text}")
             else:
                 # Обычный пост
-                text = strip_html(post.get("content", "")) or "[медиа/без текста]"
+                # Восстанавливаем ссылки в тексте
+                content_with_links = restore_links_in_text(
+                    post.get("content", ""), 
+                    post.get("entities", []), 
+                    post.get("facets", [])
+                )
+                text = strip_html(content_with_links) or "[медиа/без текста]"
                 print(f"{created_at} @{user} ({display_name}): {text}")
 
 
