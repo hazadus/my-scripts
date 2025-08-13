@@ -64,35 +64,39 @@ def restore_links_in_text(text: str, entities: list = None, facets: list = None)
     Returns:
         Текст с восстановленными полными ссылками
     """
-    if not text or not entities:
+    if not text or not facets:
         return text
     
     print(f"DEBUG: Восстанавливаем ссылки в тексте длиной {len(text)}")
     print(f"DEBUG: Текст: {text}")
-    print(f"DEBUG: Entities: {entities}")
+    print(f"DEBUG: Facets: {facets}")
     
-    # Сортируем entities по позиции в тексте (от конца к началу, чтобы не сбить индексы)
-    sorted_entities = sorted(entities, key=lambda x: x.get('index', {}).get('start', 0), reverse=True)
+    # Сортируем facets по позиции в тексте (от конца к началу, чтобы не сбить индексы)
+    sorted_facets = sorted(facets, key=lambda x: x.index.byte_start, reverse=True)
     
     restored_text = text
     
-    for entity in sorted_entities:
-        print(f"DEBUG: Обрабатываем entity: {entity}")
-        if entity.get('type') == 'app.bsky.richtext.facet#link':
-            index = entity.get('index', {})
-            start = index.get('start', 0)
-            end = index.get('end', 0)
-            url = entity.get('value', '')
-            
-            print(f"DEBUG: Ссылка: start={start}, end={end}, url={url}")
-            
-            if start < end and start < len(restored_text) and end <= len(restored_text):
-                # Заменяем сокращенную ссылку на полную
-                shortened_link = restored_text[start:end]
-                print(f"DEBUG: Заменяем '{shortened_link}' на '{url}'")
-                restored_text = restored_text[:start] + url + restored_text[end:]
-            else:
-                print(f"DEBUG: Индексы некорректны: start={start}, end={end}, len={len(restored_text)}")
+    for facet in sorted_facets:
+        print(f"DEBUG: Обрабатываем facet: {facet}")
+        
+        # Проверяем, есть ли ссылки в features
+        if hasattr(facet, 'features') and facet.features:
+            for feature in facet.features:
+                if hasattr(feature, 'uri') and feature.uri:
+                    # Это ссылка
+                    start = facet.index.byte_start
+                    end = facet.index.byte_end
+                    url = feature.uri
+                    
+                    print(f"DEBUG: Ссылка: start={start}, end={end}, url={url}")
+                    
+                    if start < end and start < len(restored_text) and end <= len(restored_text):
+                        # Заменяем сокращенную ссылку на полную
+                        shortened_link = restored_text[start:end]
+                        print(f"DEBUG: Заменяем '{shortened_link}' на '{url}'")
+                        restored_text = restored_text[:start] + url + restored_text[end:]
+                    else:
+                        print(f"DEBUG: Индексы некорректны: start={start}, end={end}, len={len(restored_text)}")
     
     print(f"DEBUG: Результат: {restored_text}")
     return restored_text
