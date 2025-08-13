@@ -2,3 +2,5 @@
 scripts/*.secret
 scripts/*.opml
 .vscode/
+*.pyc
+scripts/__pycache__/
