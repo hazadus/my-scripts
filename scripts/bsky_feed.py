@@ -116,35 +116,22 @@ def fetch_home_for_date(
             # Обновляем cursor для пагинации к более старым постам
             cursor = response.cursor
             
-            # Отладочная информация для первого поста
-            if fetched == len(chunk) and chunk:  # Только для первого чанка
-                first_post = chunk[0]
-                print(f"DEBUG: Структура первого поста:")
-                print(f"  - Тип post: {type(first_post)}")
-                print(f"  - post.post.record: {hasattr(first_post.post, 'record')}")
-                if hasattr(first_post.post, 'record'):
-                    print(f"  - Тип record: {type(first_post.post.record)}")
-                    print(f"  - record.createdAt: {getattr(first_post.post.record, 'createdAt', 'НЕТ')}")
-                    print(f"  - record.text: {getattr(first_post.post.record, 'text', 'НЕТ')}")
-                    print(f"  - Доступные атрибуты record: {dir(first_post.post.record)}")
-                print(f"  - post.post.author.handle: {first_post.post.author.handle}")
-                print(f"  - post.post.author.displayName: {getattr(first_post.post.author, 'displayName', 'НЕТ')}")
-                print(f"  - post.post.author.display_name: {getattr(first_post.post.author, 'display_name', 'НЕТ')}")
-                print(f"  - Доступные атрибуты post: {dir(first_post)}")
-                print(f"  - Доступные атрибуты post.post: {dir(first_post.post)}")
-                print(f"  - Доступные атрибуты author: {dir(first_post.post.author)}")
-                print(f"  - Проверка времени создания:")
-                print(f"    - record.created_at: {getattr(first_post.post.record, 'created_at', 'НЕТ')}")
-                print(f"    - record.createdAt: {getattr(first_post.post.record, 'createdAt', 'НЕТ')}")
-                print(f"    - post.indexedAt: {getattr(first_post, 'indexedAt', 'НЕТ')}")
-                print(f"    - post.post.indexedAt: {getattr(first_post.post, 'indexedAt', 'НЕТ')}")
-                print()
+
+
+
+
+
+
+
+
+
+
+
 
             for post in chunk:
                 try:
                     # Получаем время создания поста из record.createdAt
                     if not hasattr(post.post, 'record'):
-                        print(f"DEBUG: Пост не имеет атрибута 'record': {type(post.post)}")
                         continue
                         
                     # Пробуем разные способы получения времени создания поста
@@ -164,8 +151,6 @@ def fetch_home_for_date(
                         created_at_str = post.post.indexedAt
                     
                     if not created_at_str:
-                        print(f"DEBUG: Пост не имеет времени создания. Record атрибуты: {dir(post.post.record)}")
-                        print(f"DEBUG: Post атрибуты: {dir(post.post)}")
                         continue
                         
                     created_at = dt.datetime.fromisoformat(
@@ -201,8 +186,7 @@ def fetch_home_for_date(
                         
                         results.append(post_dict)
                 except Exception as e:
-                    print(f"DEBUG: Ошибка при обработке поста: {e}")
-                    print(f"DEBUG: Структура поста: {dir(post)}")
+                    print(f"Ошибка при обработке поста: {e}")
                     continue
 
             # Критерий остановки пагинации: самый старый пост в чанке стал старее даты
