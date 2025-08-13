@@ -123,12 +123,17 @@ def fetch_home_for_date(
                 print(f"  - Тип post: {type(first_post)}")
                 print(f"  - post.post.record: {hasattr(first_post.post, 'record')}")
                 if hasattr(first_post.post, 'record'):
-                    print(f"  - record.createdAt: {first_post.post.record.get('createdAt')}")
-                    print(f"  - record.text: {first_post.post.record.get('text')}")
+                    print(f"  - Тип record: {type(first_post.post.record)}")
+                    print(f"  - record.createdAt: {getattr(first_post.post.record, 'createdAt', 'НЕТ')}")
+                    print(f"  - record.text: {getattr(first_post.post.record, 'text', 'НЕТ')}")
+                    print(f"  - Доступные атрибуты record: {dir(first_post.post.record)}")
                 print(f"  - post.post.author.handle: {first_post.post.author.handle}")
                 print(f"  - post.post.author.displayName: {first_post.post.author.displayName}")
                 print(f"  - Доступные атрибуты post: {dir(first_post)}")
                 print(f"  - Доступные атрибуты post.post: {dir(first_post.post)}")
+                print(f"  - Проверка времени создания:")
+                print(f"    - post.indexedAt: {getattr(first_post, 'indexedAt', 'НЕТ')}")
+                print(f"    - post.post.indexedAt: {getattr(first_post.post, 'indexedAt', 'НЕТ')}")
                 print()
 
             for post in chunk:
@@ -138,9 +143,22 @@ def fetch_home_for_date(
                         print(f"DEBUG: Пост не имеет атрибута 'record': {type(post.post)}")
                         continue
                         
-                    created_at_str = post.post.record.get("createdAt")
+                    # Пробуем разные способы получения времени создания поста
+                    created_at_str = None
+                    
+                    # Сначала пробуем record.createdAt
+                    if hasattr(post.post.record, 'createdAt'):
+                        created_at_str = post.post.record.createdAt
+                    # Если нет, пробуем indexedAt
+                    elif hasattr(post.post, 'indexedAt'):
+                        created_at_str = post.post.indexedAt
+                    # Если и этого нет, пробуем post.indexedAt
+                    elif hasattr(post.post, 'indexedAt'):
+                        created_at_str = post.post.indexedAt
+                    
                     if not created_at_str:
-                        print(f"DEBUG: Пост не имеет createdAt: {post.post.record}")
+                        print(f"DEBUG: Пост не имеет времени создания. Record атрибуты: {dir(post.post.record)}")
+                        print(f"DEBUG: Post атрибуты: {dir(post.post)}")
                         continue
                         
                     created_at = dt.datetime.fromisoformat(
@@ -154,7 +172,7 @@ def fetch_home_for_date(
                             "created_at": created_at,
                             "author": post.post.author.handle,
                             "display_name": post.post.author.displayName,
-                            "content": post.post.record.get("text", ""),
+                            "content": getattr(post.post.record, 'text', ''),
                             "uri": post.post.uri,
                             "cid": post.post.cid,
                             "is_repost": hasattr(post, "reason") and post.reason is not None,
@@ -182,7 +200,17 @@ def fetch_home_for_date(
 
             # Критерий остановки пагинации: самый старый пост в чанке стал старее даты
             if chunk:
-                oldest_created_str = chunk[-1].post.record.get("createdAt")
+                oldest_created_str = None
+                last_post = chunk[-1]
+                
+                # Пробуем разные способы получения времени создания поста
+                if hasattr(last_post.post.record, 'createdAt'):
+                    oldest_created_str = last_post.post.record.createdAt
+                elif hasattr(last_post, 'indexedAt'):
+                    oldest_created_str = last_post.indexedAt
+                elif hasattr(last_post.post, 'indexedAt'):
+                    oldest_created_str = last_post.post.indexedAt
+                
                 if oldest_created_str:
                     oldest_created = dt.datetime.fromisoformat(
                         oldest_created_str.replace('Z', '+00:00')
