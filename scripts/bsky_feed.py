@@ -128,10 +128,14 @@ def fetch_home_for_date(
                     print(f"  - record.text: {getattr(first_post.post.record, 'text', 'НЕТ')}")
                     print(f"  - Доступные атрибуты record: {dir(first_post.post.record)}")
                 print(f"  - post.post.author.handle: {first_post.post.author.handle}")
-                print(f"  - post.post.author.displayName: {first_post.post.author.displayName}")
+                print(f"  - post.post.author.displayName: {getattr(first_post.post.author, 'displayName', 'НЕТ')}")
+                print(f"  - post.post.author.display_name: {getattr(first_post.post.author, 'display_name', 'НЕТ')}")
                 print(f"  - Доступные атрибуты post: {dir(first_post)}")
                 print(f"  - Доступные атрибуты post.post: {dir(first_post.post)}")
+                print(f"  - Доступные атрибуты author: {dir(first_post.post.author)}")
                 print(f"  - Проверка времени создания:")
+                print(f"    - record.created_at: {getattr(first_post.post.record, 'created_at', 'НЕТ')}")
+                print(f"    - record.createdAt: {getattr(first_post.post.record, 'createdAt', 'НЕТ')}")
                 print(f"    - post.indexedAt: {getattr(first_post, 'indexedAt', 'НЕТ')}")
                 print(f"    - post.post.indexedAt: {getattr(first_post.post, 'indexedAt', 'НЕТ')}")
                 print()
@@ -146,8 +150,11 @@ def fetch_home_for_date(
                     # Пробуем разные способы получения времени создания поста
                     created_at_str = None
                     
-                    # Сначала пробуем record.createdAt
-                    if hasattr(post.post.record, 'createdAt'):
+                    # Сначала пробуем record.created_at (с подчеркиванием)
+                    if hasattr(post.post.record, 'created_at'):
+                        created_at_str = post.post.record.created_at
+                    # Если нет, пробуем record.createdAt
+                    elif hasattr(post.post.record, 'createdAt'):
                         created_at_str = post.post.record.createdAt
                     # Если нет, пробуем indexedAt
                     elif hasattr(post.post, 'indexedAt'):
@@ -171,13 +178,13 @@ def fetch_home_for_date(
                         post_dict = {
                             "created_at": created_at,
                             "author": post.post.author.handle,
-                            "display_name": post.post.author.displayName,
+                            "display_name": getattr(post.post.author, 'displayName', None) or getattr(post.post.author, 'display_name', None) or post.post.author.handle,
                             "content": getattr(post.post.record, 'text', ''),
                             "uri": post.post.uri,
                             "cid": post.post.cid,
                             "is_repost": hasattr(post, "reason") and post.reason is not None,
-                            "repost_author": post.reason.by.handle if hasattr(post, "reason") and post.reason else None,
-                            "repost_display_name": post.reason.by.displayName if hasattr(post, "reason") and post.reason else None,
+                            "repost_author": getattr(post.reason.by, 'handle', None) if hasattr(post, "reason") and post.reason and hasattr(post.reason, 'by') else None,
+                            "repost_display_name": getattr(post.reason.by, 'displayName', None) or getattr(post.reason.by, 'display_name', None) or getattr(post.reason.by, 'handle', None) if hasattr(post, "reason") and post.reason and hasattr(post.reason, 'by') else None,
                             "media": [],
                             "url": f"https://bsky.app/profile/{post.post.author.handle}/post/{post.post.uri.split('/')[-1]}"
                         }
@@ -204,7 +211,9 @@ def fetch_home_for_date(
                 last_post = chunk[-1]
                 
                 # Пробуем разные способы получения времени создания поста
-                if hasattr(last_post.post.record, 'createdAt'):
+                if hasattr(last_post.post.record, 'created_at'):
+                    oldest_created_str = last_post.post.record.created_at
+                elif hasattr(last_post.post.record, 'createdAt'):
                     oldest_created_str = last_post.post.record.createdAt
                 elif hasattr(last_post, 'indexedAt'):
                     oldest_created_str = last_post.indexedAt
