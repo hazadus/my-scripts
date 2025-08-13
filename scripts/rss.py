@@ -402,8 +402,8 @@ def format_posts_markdown(
 
     # Заголовок отчета
     output = f"## Посты за {date_str}\n\n"
-    output += f"Всего постов: {len(posts)}\n"
-    output += f"Всего лент: {feeds_count}\n\n"
+    output += f"- Всего постов: {len(posts)}\n"
+    output += f"- Всего лент: {feeds_count}\n\n"
     output += "----\n\n"
 
     # Форматируем каждый пост
