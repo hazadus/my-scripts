@@ -165,19 +165,18 @@ uv run masto_feed.py --help
 
 - Аккаунт на Bluesky
 - App Password (создается в настройках Bluesky)
-- Переменные окружения `BSKY_IDENTIFIER` и `BSKY_PASSWORD`
 
 ### Использование
 
 ```bash
 # Показать посты за сегодня
-uv run bsky_feed.py
+uv run bsky_feed.py --identifier "username.bsky.social" --password "your-app-password"
 
 # Показать посты за указанную дату
-uv run bsky_feed.py 2024-08-13
+uv run bsky_feed.py --identifier "username.bsky.social" --password "your-app-password" 2024-08-13
 
 # Вывести посты в формате Markdown (с эмодзи, ссылками и изображениями)
-uv run bsky_feed.py --markdown 2024-08-13
+uv run bsky_feed.py --identifier "username.bsky.social" --password "your-app-password" --markdown 2024-08-13
 
 # Посмотреть справку по командам
 uv run bsky_feed.py --help

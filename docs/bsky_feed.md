@@ -12,12 +12,6 @@
 
 1. Перейдите в настройки Bluesky: https://bsky.app/settings
 2. В разделе "App Passwords" создайте новый пароль
-3. Установите переменные окружения:
-
-```bash
-export BSKY_IDENTIFIER='your-username.bsky.social'
-export BSKY_PASSWORD='your-app-password'
-```
 
 **Важно:** Используйте App Password, а не основной пароль от аккаунта!
 
@@ -26,21 +20,27 @@ export BSKY_PASSWORD='your-app-password'
 ### Базовое использование (посты за сегодня)
 
 ```bash
-./bsky_feed.py
+./bsky_feed.py --identifier "username.bsky.social" --password "your-app-password"
 ```
 
 ### Посты за конкретную дату
 
 ```bash
-./bsky_feed.py 2024-10-31
+./bsky_feed.py --identifier "username.bsky.social" --password "your-app-password" 2024-10-31
 ```
 
 ### Вывод в формате Markdown
 
 ```bash
-./bsky_feed.py --markdown
-./bsky_feed.py 2024-10-31 --markdown
+./bsky_feed.py --identifier "username.bsky.social" --password "your-app-password" --markdown
+./bsky_feed.py --identifier "username.bsky.social" --password "your-app-password" 2024-10-31 --markdown
 ```
+
+### Параметры аутентификации
+
+- `--identifier` - ваш идентификатор Bluesky (например: `username.bsky.social`)
+- `--password` - App Password для Bluesky
+- Оба параметра обязательны для работы скрипта
 
 ## Возможности
 
@@ -95,10 +95,13 @@ export BSKY_PASSWORD='your-app-password'
 ## Устранение неполадок
 
 ### Ошибка аутентификации
-Убедитесь, что переменные окружения установлены корректно:
+Убедитесь, что параметры аутентификации переданы корректно:
 ```bash
-echo $BSKY_IDENTIFIER
-echo $BSKY_PASSWORD
+# Проверьте, что используете правильный идентификатор
+./bsky_feed.py --identifier "username.bsky.social" --password "your-app-password"
+
+# Убедитесь, что App Password создан в настройках Bluesky
+# и не является основным паролем от аккаунта
 ```
 
 ### Ошибка "Неверный формат даты"

@@ -20,7 +20,6 @@ Docs:
 """
 import argparse
 import datetime as dt
-import os
 import re
 from typing import Optional
 
@@ -39,19 +38,8 @@ def parse_date(date_str: str | None) -> dt.date:
         )
 
 
-def make_client() -> Client:
+def make_client(identifier: str, password: str) -> Client:
     """Создает клиент Bluesky с аутентификацией."""
-    # Проверяем наличие переменных окружения для аутентификации
-    identifier = os.getenv("BSKY_IDENTIFIER")
-    password = os.getenv("BSKY_PASSWORD")
-    
-    if not identifier or not password:
-        raise SystemExit(
-            "Необходимо установить переменные окружения:\n"
-            "export BSKY_IDENTIFIER='your-username.bsky.social'\n"
-            "export BSKY_PASSWORD='your-app-password'"
-        )
-    
     client = Client()
     client.login(identifier, password)
     return client
@@ -196,10 +184,20 @@ def main() -> None:
         action="store_true",
         help="Выводить посты в формате Markdown (ссылки и изображения)",
     )
+    parser.add_argument(
+        "--identifier",
+        required=True,
+        help="Идентификатор Bluesky (например: username.bsky.social)",
+    )
+    parser.add_argument(
+        "--password",
+        required=True,
+        help="App Password для Bluesky",
+    )
     args = parser.parse_args()
 
     target_date = parse_date(args.date)
-    client = make_client()
+    client = make_client(args.identifier, args.password)
     posts = fetch_home_for_date(client, target_date)
 
     if not posts:
