@@ -384,6 +384,7 @@ def format_posts_markdown(
     *,
     posts: list[dict],
     date_str: str,
+    feeds_count: int,
 ) -> str:
     """
     Форматирует посты в формате Markdown.
@@ -391,16 +392,18 @@ def format_posts_markdown(
     Args:
         posts (list): Список постов
         date_str (str): Дата в формате YYYY-MM-DD
+        feeds_count (int): Количество RSS лент
 
     Returns:
         str: Отформатированный отчет в Markdown
     """
     if not posts:
-        return f"## Посты за {date_str}\n\nВсего постов: 0\n\nПосты за указанную дату не найдены."
+        return f"## Посты за {date_str}\n\nВсего постов: 0\nВсего лент: {feeds_count}\n\nПосты за указанную дату не найдены."
 
     # Заголовок отчета
     output = f"## Посты за {date_str}\n\n"
-    output += f"Всего постов: {len(posts)}\n\n"
+    output += f"Всего постов: {len(posts)}\n"
+    output += f"Всего лент: {feeds_count}\n\n"
     output += "----\n\n"
 
     # Форматируем каждый пост
@@ -506,7 +509,9 @@ async def read_posts_for_date(
 
     if markdown:
         # Выводим в формате Markdown
-        markdown_output = format_posts_markdown(posts=all_posts, date_str=date_str)
+        markdown_output = format_posts_markdown(
+            posts=all_posts, date_str=date_str, feeds_count=len(feeds)
+        )
         print(markdown_output)
 
         # Показываем ошибки после отчета в режиме silent
