@@ -164,18 +164,23 @@ def main() -> None:
     for status in statuses:
         created_at = status["created_at"].astimezone().strftime("%H:%M")
         user = status["account"]["acct"]
-        
+
         # Проверяем, является ли это бустом
         is_reblog = status.get("reblog") is not None
         original_status = status.get("reblog") if is_reblog else status
-        
+
         if args.markdown:
             print("----")
             if is_reblog:
                 # Это буст - показываем информацию о бусте
                 reblogged_user = original_status["account"]["acct"]
-                print(f"**🔄 {created_at} 👤 @{user} забустил пост от @{reblogged_user}**")
-                body = html_to_markdown(original_status.get("content", "")) or "[медиа/без текста]"
+                print(
+                    f"**🔄 {created_at} 👤 @{user} забустил пост от @{reblogged_user}**"
+                )
+                body = (
+                    html_to_markdown(original_status.get("content", ""))
+                    or "[медиа/без текста]"
+                )
                 print(f"💬 {body}")
                 # Медиа (изображения) из оригинального поста
                 for media in original_status.get("media_attachments", []) or []:
@@ -194,7 +199,9 @@ def main() -> None:
             else:
                 # Обычный пост
                 print(f"**🕒 {created_at} 👤 @{user}**")
-                body = html_to_markdown(status.get("content", "")) or "[медиа/без текста]"
+                body = (
+                    html_to_markdown(status.get("content", "")) or "[медиа/без текста]"
+                )
                 print(f"💬 {body}")
                 # Медиа (изображения)
                 for media in status.get("media_attachments", []) or []:
@@ -215,7 +222,10 @@ def main() -> None:
             if is_reblog:
                 # Это буст - показываем информацию о бусте
                 reblogged_user = original_status["account"]["acct"]
-                text = strip_html(original_status.get("content", "")) or "[медиа/без текста]"
+                text = (
+                    strip_html(original_status.get("content", ""))
+                    or "[медиа/без текста]"
+                )
                 print(f"{created_at} @{user} забустил от @{reblogged_user}: {text}")
             else:
                 # Обычный пост

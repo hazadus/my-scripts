@@ -55,37 +55,43 @@ def strip_html(content: str) -> str:
 
 def restore_links_in_text(text: str, entities: list = None, facets: list = None) -> str:
     """Восстанавливает полные ссылки в тексте поста, заменяя сокращенные URL на полные.
-    
+
     Args:
         text: Исходный текст поста
         entities: Список сущностей (ссылок) из поста
         facets: Список фасетов (форматирования) из поста
-    
+
     Returns:
         Текст с восстановленными полными ссылками
     """
     if not text or not facets:
         return text
-    
+
     # Сортируем facets по позиции в тексте (от конца к началу, чтобы не сбить индексы)
     sorted_facets = sorted(facets, key=lambda x: x.index.byte_start, reverse=True)
-    
+
     restored_text = text
-    
+
     for facet in sorted_facets:
         # Проверяем, есть ли ссылки в features
-        if hasattr(facet, 'features') and facet.features:
+        if hasattr(facet, "features") and facet.features:
             for feature in facet.features:
-                if hasattr(feature, 'uri') and feature.uri:
+                if hasattr(feature, "uri") and feature.uri:
                     # Это ссылка
                     start = facet.index.byte_start
                     end = facet.index.byte_end
                     url = feature.uri
-                    
-                    if start < end and start < len(restored_text) and end <= len(restored_text):
+
+                    if (
+                        start < end
+                        and start < len(restored_text)
+                        and end <= len(restored_text)
+                    ):
                         # Заменяем сокращенную ссылку на полную
-                        restored_text = restored_text[:start] + url + restored_text[end:]
-    
+                        restored_text = (
+                            restored_text[:start] + url + restored_text[end:]
+                        )
+
     return restored_text
 
 
@@ -148,83 +154,92 @@ def fetch_home_for_date(
 
             chunk = response.feed
             fetched += len(chunk)
-            
+
             # Обновляем cursor для пагинации к более старым постам
             cursor = response.cursor
-            
-
-
-
-
-
-
-
-
-
-
-
 
             for post in chunk:
                 try:
                     # Получаем время создания поста из record.createdAt
-                    if not hasattr(post.post, 'record'):
+                    if not hasattr(post.post, "record"):
                         continue
-                        
+
                     # Пробуем разные способы получения времени создания поста
                     created_at_str = None
-                    
+
                     # Сначала пробуем record.created_at (с подчеркиванием)
-                    if hasattr(post.post.record, 'created_at'):
+                    if hasattr(post.post.record, "created_at"):
                         created_at_str = post.post.record.created_at
                     # Если нет, пробуем record.createdAt
-                    elif hasattr(post.post.record, 'createdAt'):
+                    elif hasattr(post.post.record, "createdAt"):
                         created_at_str = post.post.record.createdAt
                     # Если нет, пробуем indexedAt
-                    elif hasattr(post.post, 'indexedAt'):
+                    elif hasattr(post.post, "indexedAt"):
                         created_at_str = post.post.indexedAt
                     # Если и этого нет, пробуем post.indexedAt
-                    elif hasattr(post.post, 'indexedAt'):
+                    elif hasattr(post.post, "indexedAt"):
                         created_at_str = post.post.indexedAt
-                    
+
                     if not created_at_str:
                         continue
-                        
+
                     created_at = dt.datetime.fromisoformat(
-                        created_at_str.replace('Z', '+00:00')
+                        created_at_str.replace("Z", "+00:00")
                     ).astimezone(local_tz)
                     post_date = created_at.date()
-                    
+
                     if post_date == target_date:
                         # Преобразуем в формат, совместимый с логикой вывода
-                        entities = getattr(post.post.record, 'entities', [])
-                        facets = getattr(post.post.record, 'facets', [])
-                        
+                        entities = getattr(post.post.record, "entities", [])
+                        facets = getattr(post.post.record, "facets", [])
+
                         post_dict = {
                             "created_at": created_at,
                             "author": post.post.author.handle,
-                            "display_name": getattr(post.post.author, 'displayName', None) or getattr(post.post.author, 'display_name', None) or post.post.author.handle,
-                            "content": getattr(post.post.record, 'text', ''),
+                            "display_name": getattr(
+                                post.post.author, "displayName", None
+                            )
+                            or getattr(post.post.author, "display_name", None)
+                            or post.post.author.handle,
+                            "content": getattr(post.post.record, "text", ""),
                             "entities": entities,
                             "facets": facets,
                             "uri": post.post.uri,
                             "cid": post.post.cid,
-                            "is_repost": hasattr(post, "reason") and post.reason is not None,
-                            "repost_author": getattr(post.reason.by, 'handle', None) if hasattr(post, "reason") and post.reason and hasattr(post.reason, 'by') else None,
-                            "repost_display_name": getattr(post.reason.by, 'displayName', None) or getattr(post.reason.by, 'display_name', None) or getattr(post.reason.by, 'handle', None) if hasattr(post, "reason") and post.reason and hasattr(post.reason, 'by') else None,
+                            "is_repost": hasattr(post, "reason")
+                            and post.reason is not None,
+                            "repost_author": (
+                                getattr(post.reason.by, "handle", None)
+                                if hasattr(post, "reason")
+                                and post.reason
+                                and hasattr(post.reason, "by")
+                                else None
+                            ),
+                            "repost_display_name": (
+                                getattr(post.reason.by, "displayName", None)
+                                or getattr(post.reason.by, "display_name", None)
+                                or getattr(post.reason.by, "handle", None)
+                                if hasattr(post, "reason")
+                                and post.reason
+                                and hasattr(post.reason, "by")
+                                else None
+                            ),
                             "media": [],
-                            "url": f"https://bsky.app/profile/{post.post.author.handle}/post/{post.post.uri.split('/')[-1]}"
+                            "url": f"https://bsky.app/profile/{post.post.author.handle}/post/{post.post.uri.split('/')[-1]}",
                         }
-                        
+
                         # Добавляем медиа, если есть
                         if hasattr(post.post, "embed") and post.post.embed:
                             if hasattr(post.post.embed, "images"):
                                 for img in post.post.embed.images:
-                                    post_dict["media"].append({
-                                        "type": "image",
-                                        "url": img.fullsize,
-                                        "alt": img.alt or "image"
-                                    })
-                        
+                                    post_dict["media"].append(
+                                        {
+                                            "type": "image",
+                                            "url": img.fullsize,
+                                            "alt": img.alt or "image",
+                                        }
+                                    )
+
                         results.append(post_dict)
                 except Exception as e:
                     print(f"Ошибка при обработке поста: {e}")
@@ -234,21 +249,25 @@ def fetch_home_for_date(
             if chunk:
                 oldest_created_str = None
                 last_post = chunk[-1]
-                
+
                 # Пробуем разные способы получения времени создания поста
-                if hasattr(last_post.post.record, 'created_at'):
+                if hasattr(last_post.post.record, "created_at"):
                     oldest_created_str = last_post.post.record.created_at
-                elif hasattr(last_post.post.record, 'createdAt'):
+                elif hasattr(last_post.post.record, "createdAt"):
                     oldest_created_str = last_post.post.record.createdAt
-                elif hasattr(last_post, 'indexedAt'):
+                elif hasattr(last_post, "indexedAt"):
                     oldest_created_str = last_post.indexedAt
-                elif hasattr(last_post.post, 'indexedAt'):
+                elif hasattr(last_post.post, "indexedAt"):
                     oldest_created_str = last_post.post.indexedAt
-                
+
                 if oldest_created_str:
-                    oldest_created = dt.datetime.fromisoformat(
-                        oldest_created_str.replace('Z', '+00:00')
-                    ).astimezone(local_tz).date()
+                    oldest_created = (
+                        dt.datetime.fromisoformat(
+                            oldest_created_str.replace("Z", "+00:00")
+                        )
+                        .astimezone(local_tz)
+                        .date()
+                    )
                     if oldest_created < target_date:
                         break
 
@@ -304,22 +323,24 @@ def main() -> None:
         created_at = post["created_at"].strftime("%H:%M")
         user = post["author"]
         display_name = post["display_name"] or user
-        
+
         # Проверяем, является ли это репостом
         is_repost = post.get("is_repost", False)
-        
+
         if args.markdown:
             print("----")
             if is_repost:
                 # Это репост - показываем информацию о репосте
                 repost_user = post.get("repost_author", "unknown")
                 repost_display_name = post.get("repost_display_name") or repost_user
-                print(f"**🔄 {created_at} 👤 @{user} ({display_name}) репостнул пост от @{repost_user} ({repost_display_name})**")
+                print(
+                    f"**🔄 {created_at} 👤 @{user} ({display_name}) репостнул пост от @{repost_user} ({repost_display_name})**"
+                )
                 # Восстанавливаем ссылки в тексте
                 content_with_links = restore_links_in_text(
-                    post.get("content", ""), 
-                    post.get("entities", []), 
-                    post.get("facets", [])
+                    post.get("content", ""),
+                    post.get("entities", []),
+                    post.get("facets", []),
                 )
                 body = html_to_markdown(content_with_links) or "[медиа/без текста]"
                 print(f"💬 {body}")
@@ -338,9 +359,9 @@ def main() -> None:
                 print(f"**🕒 {created_at} 👤 @{user} ({display_name})**")
                 # Восстанавливаем ссылки в тексте
                 content_with_links = restore_links_in_text(
-                    post.get("content", ""), 
-                    post.get("entities", []), 
-                    post.get("facets", [])
+                    post.get("content", ""),
+                    post.get("entities", []),
+                    post.get("facets", []),
                 )
                 body = html_to_markdown(content_with_links) or "[медиа/без текста]"
                 print(f"💬 {body}")
@@ -361,19 +382,21 @@ def main() -> None:
                 repost_user = post.get("repost_author", "unknown")
                 # Восстанавливаем ссылки в тексте
                 content_with_links = restore_links_in_text(
-                    post.get("content", ""), 
-                    post.get("entities", []), 
-                    post.get("facets", [])
+                    post.get("content", ""),
+                    post.get("entities", []),
+                    post.get("facets", []),
                 )
                 text = strip_html(content_with_links) or "[медиа/без текста]"
-                print(f"{created_at} @{user} ({display_name}) репостнул от @{repost_user}: {text}")
+                print(
+                    f"{created_at} @{user} ({display_name}) репостнул от @{repost_user}: {text}"
+                )
             else:
                 # Обычный пост
                 # Восстанавливаем ссылки в тексте
                 content_with_links = restore_links_in_text(
-                    post.get("content", ""), 
-                    post.get("entities", []), 
-                    post.get("facets", [])
+                    post.get("content", ""),
+                    post.get("entities", []),
+                    post.get("facets", []),
                 )
                 text = strip_html(content_with_links) or "[медиа/без текста]"
                 print(f"{created_at} @{user} ({display_name}): {text}")
