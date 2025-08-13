@@ -115,48 +115,80 @@ def fetch_home_for_date(
             
             # Обновляем cursor для пагинации к более старым постам
             cursor = response.cursor
+            
+            # Отладочная информация для первого поста
+            if fetched == len(chunk) and chunk:  # Только для первого чанка
+                first_post = chunk[0]
+                print(f"DEBUG: Структура первого поста:")
+                print(f"  - Тип post: {type(first_post)}")
+                print(f"  - post.post.record: {hasattr(first_post.post, 'record')}")
+                if hasattr(first_post.post, 'record'):
+                    print(f"  - record.createdAt: {first_post.post.record.get('createdAt')}")
+                    print(f"  - record.text: {first_post.post.record.get('text')}")
+                print(f"  - post.post.author.handle: {first_post.post.author.handle}")
+                print(f"  - post.post.author.displayName: {first_post.post.author.displayName}")
+                print(f"  - Доступные атрибуты post: {dir(first_post)}")
+                print(f"  - Доступные атрибуты post.post: {dir(first_post.post)}")
+                print()
 
             for post in chunk:
-                created_at = dt.datetime.fromisoformat(
-                    post.post.indexedAt.replace('Z', '+00:00')
-                ).astimezone(local_tz)
-                post_date = created_at.date()
-                
-                if post_date == target_date:
-                    # Преобразуем в формат, совместимый с логикой вывода
-                    post_dict = {
-                        "created_at": created_at,
-                        "author": post.post.author.handle,
-                        "display_name": post.post.author.displayName,
-                        "content": post.post.record.get("text", ""),
-                        "uri": post.post.uri,
-                        "cid": post.post.cid,
-                        "is_repost": hasattr(post, "reason") and post.reason is not None,
-                        "repost_author": post.reason.by.handle if hasattr(post, "reason") and post.reason else None,
-                        "repost_display_name": post.reason.by.displayName if hasattr(post, "reason") and post.reason else None,
-                        "media": [],
-                        "url": f"https://bsky.app/profile/{post.post.author.handle}/post/{post.post.uri.split('/')[-1]}"
-                    }
+                try:
+                    # Получаем время создания поста из record.createdAt
+                    if not hasattr(post.post, 'record'):
+                        print(f"DEBUG: Пост не имеет атрибута 'record': {type(post.post)}")
+                        continue
+                        
+                    created_at_str = post.post.record.get("createdAt")
+                    if not created_at_str:
+                        print(f"DEBUG: Пост не имеет createdAt: {post.post.record}")
+                        continue
+                        
+                    created_at = dt.datetime.fromisoformat(
+                        created_at_str.replace('Z', '+00:00')
+                    ).astimezone(local_tz)
+                    post_date = created_at.date()
                     
-                    # Добавляем медиа, если есть
-                    if hasattr(post.post, "embed") and post.post.embed:
-                        if hasattr(post.post.embed, "images"):
-                            for img in post.post.embed.images:
-                                post_dict["media"].append({
-                                    "type": "image",
-                                    "url": img.fullsize,
-                                    "alt": img.alt or "image"
-                                })
-                    
-                    results.append(post_dict)
+                    if post_date == target_date:
+                        # Преобразуем в формат, совместимый с логикой вывода
+                        post_dict = {
+                            "created_at": created_at,
+                            "author": post.post.author.handle,
+                            "display_name": post.post.author.displayName,
+                            "content": post.post.record.get("text", ""),
+                            "uri": post.post.uri,
+                            "cid": post.post.cid,
+                            "is_repost": hasattr(post, "reason") and post.reason is not None,
+                            "repost_author": post.reason.by.handle if hasattr(post, "reason") and post.reason else None,
+                            "repost_display_name": post.reason.by.displayName if hasattr(post, "reason") and post.reason else None,
+                            "media": [],
+                            "url": f"https://bsky.app/profile/{post.post.author.handle}/post/{post.post.uri.split('/')[-1]}"
+                        }
+                        
+                        # Добавляем медиа, если есть
+                        if hasattr(post.post, "embed") and post.post.embed:
+                            if hasattr(post.post.embed, "images"):
+                                for img in post.post.embed.images:
+                                    post_dict["media"].append({
+                                        "type": "image",
+                                        "url": img.fullsize,
+                                        "alt": img.alt or "image"
+                                    })
+                        
+                        results.append(post_dict)
+                except Exception as e:
+                    print(f"DEBUG: Ошибка при обработке поста: {e}")
+                    print(f"DEBUG: Структура поста: {dir(post)}")
+                    continue
 
             # Критерий остановки пагинации: самый старый пост в чанке стал старее даты
             if chunk:
-                oldest_created = dt.datetime.fromisoformat(
-                    chunk[-1].post.indexedAt.replace('Z', '+00:00')
-                ).astimezone(local_tz).date()
-                if oldest_created < target_date:
-                    break
+                oldest_created_str = chunk[-1].post.record.get("createdAt")
+                if oldest_created_str:
+                    oldest_created = dt.datetime.fromisoformat(
+                        oldest_created_str.replace('Z', '+00:00')
+                    ).astimezone(local_tz).date()
+                    if oldest_created < target_date:
+                        break
 
             if fetched >= 1000:
                 break
