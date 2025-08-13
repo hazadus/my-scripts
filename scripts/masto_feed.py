@@ -8,6 +8,12 @@
 """
 Скрипт для чтения сообщений в ленте Mastodon с использованием Mastodon.py.
 
+Особенности:
+- Поддержка бустов (reblog): показывает содержимое исходного туита с указанием,
+  что это буст и кто его забустил
+- Поддержка медиа-контента (изображения)
+- Вывод в обычном текстовом формате или Markdown
+
 Docs:
 - https://github.com/halcy/Mastodon.py?tab=readme-ov-file
 - https://mastodonpy.readthedocs.io/en/stable/
@@ -158,29 +164,63 @@ def main() -> None:
     for status in statuses:
         created_at = status["created_at"].astimezone().strftime("%H:%M")
         user = status["account"]["acct"]
+        
+        # Проверяем, является ли это бустом
+        is_reblog = status.get("reblog") is not None
+        original_status = status.get("reblog") if is_reblog else status
+        
         if args.markdown:
-            body = html_to_markdown(status.get("content", "")) or "[медиа/без текста]"
             print("----")
-            print(f"**🕒 {created_at} 👤 @{user}**")
-            print(f"💬 {body}")
-            # Медиа (изображения)
-            for media in status.get("media_attachments", []) or []:
-                if media.get("type") == "image":
-                    alt = media.get("description") or "image"
-                    url = (
-                        media.get("url")
-                        or media.get("remote_url")
-                        or media.get("preview_url")
-                    )
-                    if url:
-                        print(f"\n![{alt}]({url})")
-            # Ссылка на оригинал поста
-            if status.get("url"):
-                print(f"\n[Открыть пост]({status['url']})")
+            if is_reblog:
+                # Это буст - показываем информацию о бусте
+                reblogged_user = original_status["account"]["acct"]
+                print(f"**🔄 {created_at} 👤 @{user} забустил пост от @{reblogged_user}**")
+                body = html_to_markdown(original_status.get("content", "")) or "[медиа/без текста]"
+                print(f"💬 {body}")
+                # Медиа (изображения) из оригинального поста
+                for media in original_status.get("media_attachments", []) or []:
+                    if media.get("type") == "image":
+                        alt = media.get("description") or "image"
+                        url = (
+                            media.get("url")
+                            or media.get("remote_url")
+                            or media.get("preview_url")
+                        )
+                        if url:
+                            print(f"\n![{alt}]({url})")
+                # Ссылка на оригинал забустенного поста
+                if original_status.get("url"):
+                    print(f"\n[Открыть оригинальный пост]({original_status['url']})")
+            else:
+                # Обычный пост
+                print(f"**🕒 {created_at} 👤 @{user}**")
+                body = html_to_markdown(status.get("content", "")) or "[медиа/без текста]"
+                print(f"💬 {body}")
+                # Медиа (изображения)
+                for media in status.get("media_attachments", []) or []:
+                    if media.get("type") == "image":
+                        alt = media.get("description") or "image"
+                        url = (
+                            media.get("url")
+                            or media.get("remote_url")
+                            or media.get("preview_url")
+                        )
+                        if url:
+                            print(f"\n![{alt}]({url})")
+                # Ссылка на оригинал поста
+                if status.get("url"):
+                    print(f"\n[Открыть пост]({status['url']})")
             print()
         else:
-            text = strip_html(status.get("content", "")) or "[медиа/без текста]"
-            print(f"{created_at} @{user}: {text}")
+            if is_reblog:
+                # Это буст - показываем информацию о бусте
+                reblogged_user = original_status["account"]["acct"]
+                text = strip_html(original_status.get("content", "")) or "[медиа/без текста]"
+                print(f"{created_at} @{user} забустил от @{reblogged_user}: {text}")
+            else:
+                # Обычный пост
+                text = strip_html(status.get("content", "")) or "[медиа/без текста]"
+                print(f"{created_at} @{user}: {text}")
 
 
 if __name__ == "__main__":
