@@ -67,18 +67,12 @@ def restore_links_in_text(text: str, entities: list = None, facets: list = None)
     if not text or not facets:
         return text
     
-    print(f"DEBUG: Восстанавливаем ссылки в тексте длиной {len(text)}")
-    print(f"DEBUG: Текст: {text}")
-    print(f"DEBUG: Facets: {facets}")
-    
     # Сортируем facets по позиции в тексте (от конца к началу, чтобы не сбить индексы)
     sorted_facets = sorted(facets, key=lambda x: x.index.byte_start, reverse=True)
     
     restored_text = text
     
     for facet in sorted_facets:
-        print(f"DEBUG: Обрабатываем facet: {facet}")
-        
         # Проверяем, есть ли ссылки в features
         if hasattr(facet, 'features') and facet.features:
             for feature in facet.features:
@@ -88,17 +82,10 @@ def restore_links_in_text(text: str, entities: list = None, facets: list = None)
                     end = facet.index.byte_end
                     url = feature.uri
                     
-                    print(f"DEBUG: Ссылка: start={start}, end={end}, url={url}")
-                    
                     if start < end and start < len(restored_text) and end <= len(restored_text):
                         # Заменяем сокращенную ссылку на полную
-                        shortened_link = restored_text[start:end]
-                        print(f"DEBUG: Заменяем '{shortened_link}' на '{url}'")
                         restored_text = restored_text[:start] + url + restored_text[end:]
-                    else:
-                        print(f"DEBUG: Индексы некорректны: start={start}, end={end}, len={len(restored_text)}")
     
-    print(f"DEBUG: Результат: {restored_text}")
     return restored_text
 
 
@@ -211,12 +198,6 @@ def fetch_home_for_date(
                         # Преобразуем в формат, совместимый с логикой вывода
                         entities = getattr(post.post.record, 'entities', [])
                         facets = getattr(post.post.record, 'facets', [])
-                        
-                        # Отладочная информация для первого поста
-                        if fetched == len(chunk):  # Только для первого поста
-                            print(f"DEBUG: Пост содержит entities: {entities}")
-                            print(f"DEBUG: Пост содержит facets: {facets}")
-                            print(f"DEBUG: Доступные атрибуты record: {dir(post.post.record)}")
                         
                         post_dict = {
                             "created_at": created_at,
