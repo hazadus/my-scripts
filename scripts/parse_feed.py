@@ -32,11 +32,11 @@ import argparse
 import re
 import sys
 from datetime import datetime
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
-import httpx
 import feedparser
+import httpx
 from bs4 import BeautifulSoup
 
 
