@@ -9,7 +9,9 @@
 """
 Простейший чат-бот с TUI на основе LLM от Timeweb.
 """
+import asyncio
 import sys
+import time
 
 import requests
 from textual import on
@@ -46,6 +48,14 @@ class ChatApp(App):
         margin: 1 0;
         padding: 1;
     }
+
+    .loading-message {
+        background: $warning;
+        color: $text;
+        margin: 1 0;
+        padding: 1;
+        text-style: italic;
+    }
     """
 
     BINDINGS = [("d", "toggle_dark", "Переключить тему")]
@@ -60,6 +70,8 @@ class ChatApp(App):
     ):
         self.parent_message_id = None
         self.agent_id = agent_id
+        self.loading_message = None
+        self.start_time = None
         super().__init__(driver_class, css_path, watch_css, ansi_color)
 
     def compose(self) -> ComposeResult:
@@ -73,6 +85,12 @@ class ChatApp(App):
         )
         yield Footer()
 
+    def on_mount(self) -> None:
+        """Вызывается после создания интерфейса."""
+        # Устанавливаем фокус на поле ввода сообщения
+        message_input = self.query_one("#message-input", Input)
+        message_input.focus()
+
     @on(Input.Submitted)
     def handle_message_submitted(
         self,
@@ -81,23 +99,83 @@ class ChatApp(App):
         """Обработчик отправки сообщения из поля ввода."""
         message_text = event.value
 
-        if message_text:
-            message_container = self.query_one("#messages", VerticalScroll)
-            user_message = Static(f"{message_text}", classes="user-message")
-            message_container.mount(user_message)
+        if not message_text or message_text.isspace():
+            return
 
-            result = get_llm_answer(
+        # Получаем контейнер сообщений и поле ввода
+        message_container = self.query_one("#messages", VerticalScroll)
+        message_input = self.query_one("#message-input", Input)
+
+        # Отображаем сообщение пользователя сразу
+        user_message = Static(f"{message_text}", classes="user-message")
+        message_container.mount(user_message)
+
+        # Очищаем поле ввода и блокируем его
+        message_input.value = ""
+        message_input.disabled = True
+
+        # Добавляем индикатор загрузки
+        self.loading_message = Static(
+            "⏳ Ждем ответ... (0с)",
+            classes="loading-message",
+        )
+        message_container.mount(self.loading_message)
+        message_container.scroll_end(animate=True)
+
+        # Запускаем таймер
+        self.start_time = time.time()
+        self.set_interval(1.0, self.update_loading_timer)
+
+        # Запускаем получение ответа в фоновом режиме
+        self.run_worker(
+            self.get_llm_response(message_text),
+            exclusive=True,
+        )
+
+    async def get_llm_response(self, message_text: str) -> None:
+        """Получает ответ от LLM в фоновом режиме."""
+        message_container = self.query_one("#messages", VerticalScroll)
+        message_input = self.query_one("#message-input", Input)
+
+        try:
+            # Получаем ответ от LLM
+            result = await asyncio.to_thread(
+                get_llm_answer,
                 agent_id=self.agent_id,
                 message=message_text,
                 parent_message_id=self.parent_message_id,
             )
+
+            # Удаляем индикатор загрузки
+            if self.loading_message:
+                self.loading_message.remove()
+                self.loading_message = None
+
+            # Отображаем ответ бота
             bot_message = Static(f"{result["message"]}", classes="bot-message")
             message_container.mount(bot_message)
             self.parent_message_id = result["response_id"]
 
-            # Очищаем поле ввода и прокручиваем вниз
-            self.query_one("#message-input", Input).value = ""
+        except Exception as e:
+            # В случае ошибки удаляем индикатор загрузки и показываем ошибку
+            if self.loading_message:
+                self.loading_message.remove()
+                self.loading_message = None
+
+            error_message = Static(f"❌ Ошибка: {str(e)}", classes="bot-message")
+            message_container.mount(error_message)
+
+        finally:
+            # Разблокируем поле ввода и прокручиваем вниз
+            message_input.disabled = False
+            message_input.focus()
             message_container.scroll_end(animate=True)
+
+    def update_loading_timer(self) -> None:
+        """Обновляет таймер ожидания в индикаторе загрузки."""
+        if self.loading_message and self.start_time:
+            elapsed = int(time.time() - self.start_time)
+            self.loading_message.update(f"⏳ Ждем ответ... ({elapsed}с)")
 
     def action_toggle_dark(self):
         if self.theme == "textual-dark":
