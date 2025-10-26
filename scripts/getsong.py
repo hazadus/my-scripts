@@ -7,7 +7,6 @@
 # ]
 # ///
 import argparse
-import os
 import ssl
 import subprocess
 from pathlib import Path
@@ -65,6 +64,11 @@ def download_audio(
             if info:
                 # Получаем путь к загруженному файлу
                 downloaded_file = ydl.prepare_filename(info)
+
+                # Если включена конвертация в MP3, заменяем расширение
+                if convert_to_mp3:
+                    downloaded_file = str(Path(downloaded_file).with_suffix(".mp3"))
+
                 print(f"Загрузка успешно завершена!")
                 print(f"Сохранено в: {downloaded_file}")
 
