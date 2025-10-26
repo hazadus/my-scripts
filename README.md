@@ -27,6 +27,39 @@ uv run ytdlp.py -hq "$(pbpaste)"
 # Открыть папку с закачками в Finder
 open "/Users/hazadus/Downloads/FromYouTube"
 ```
+
+## `getsong.py`
+
+Скрипт для загрузки аудио с YouTube или SoundCloud с использованием yt-dlp.
+
+### Требования
+
+- `ffmpeg` для конвертации в MP3 формат (`brew install ffmpeg`)
+
+### Использование
+
+```bash
+# Загрузить аудио по URL
+uv run getsong.py "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+
+# Загрузить и конвертировать в MP3 (требуется ffmpeg)
+uv run getsong.py --mp3 "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+
+# Загрузить аудио из буфера обмена
+uv run getsong.py "$(pbpaste)"
+
+# Загрузить, конвертировать в MP3 и открыть в системном приложении
+uv run getsong.py --mp3 --open "https://soundcloud.com/artist/track"
+
+# Открыть папку с загрузками в Finder
+open "~/Downloads/getsong"
+
+# Посмотреть справку по командам
+uv run getsong.py --help
+```
+
+Файлы сохраняются в `~/Downloads/getsong` с именем, соответствующим названию трека.
+
 ## `gitlines.py`
 
 Скрипт для анализа коммитов репозитория GitHub, отслеживания добавленных/удалённых строк и количества файлов в каждом коммите с использованием GitHub API.
