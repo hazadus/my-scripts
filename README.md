@@ -4,6 +4,7 @@
 
 - [Better alternative to shell scripts with Python, uv and pytest](https://hamatti.org/posts/better-alternative-to-shell-scripts-with-python-uv-and-pytest/)
 - [Pesky little scripts](https://rednafi.com/misc/pesky_little_scripts/)
+- [Scripts I wrote that I use all the time](https://evanhahn.com/scripts-i-wrote-that-i-use-all-the-time/)
 
 ## `ytdlp.py`
 
