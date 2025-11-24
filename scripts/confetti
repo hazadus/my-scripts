@@ -1,0 +1,4 @@
+#!/bin/bash
+# Reference: https://www.stefanjudis.com/notes/a-raycast-confetti-shell-command/
+
+open raycast://extensions/raycast/raycast/confetti
