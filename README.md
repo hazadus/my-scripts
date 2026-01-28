@@ -452,6 +452,49 @@ uv run toggltrack.py --help
 
 Скрипт автоматически получает список проектов из рабочего пространства по умолчанию и сопоставляет их с time entries для корректного отображения названий проектов и клиентов.
 
+## `readwise_search.py`
+
+Скрипт для поиска по архиву статей из Readwise. Поддерживает поиск по тэгам, источникам, названию, описанию и highlights.
+
+### Особенности
+
+- **Поиск по тексту**: ищет в названии, описании, заметках и highlights
+- **Фильтрация по тэгам**: частичное совпадение, регистронезависимо
+- **Фильтрация по источникам**: поиск по автору или названию сайта
+- **Списки тэгов и источников**: вывод всех уникальных тэгов и источников с количеством статей
+- **Комбинированный поиск**: объединение нескольких фильтров
+
+### Использование
+
+```bash
+# Показать список всех тэгов с количеством статей
+uv run readwise_search.py --tags
+
+# Показать список всех источников (авторов/сайтов)
+uv run readwise_search.py --sources
+
+# Поиск по ключевому слову
+uv run readwise_search.py --search "python"
+uv run readwise_search.py -s "машинное обучение"
+
+# Фильтр по тэгу
+uv run readwise_search.py --tag "Go"
+uv run readwise_search.py -t "llm"
+
+# Фильтр по источнику
+uv run readwise_search.py --source "habr"
+uv run readwise_search.py --source "Simon Willison"
+
+# Комбинированный поиск
+uv run readwise_search.py --search "API" --tag "FastAPI" --source "realpython"
+
+# Ограничение количества результатов (по умолчанию: 20)
+uv run readwise_search.py --search "docker" --limit 5
+
+# Посмотреть справку по командам
+uv run readwise_search.py --help
+```
+
 ## `theme.py`
 
 Скрипт для изменения системной темы macOS на светлую или тёмную с использованием `osascript` и AppleScript команд.
